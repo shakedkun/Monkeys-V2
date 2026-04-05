@@ -1,0 +1,23 @@
+<nav class="navbar">
+  <div class="nav-brand">
+    <a href="/">🐒 Monkeys</a>
+  </div>
+  <div class="nav-links">
+    <a href="/" class="nav-link">דף הבית</a>
+    <a href="/tasks" class="nav-link">משימות</a>
+    <a href="/contacts" class="nav-link">אנשי קשר</a>
+    <a href="/archive" class="nav-link">ארכיון</a>
+    <a href="/gant" class="nav-link">גנט</a>
+    <a href="/transfer_page" class="nav-link">חפיפה</a>
+    {% if current_user and current_user.privilege >= 2 %}
+      <a href="/admission" class="nav-link">קבלה</a>
+      <a href="/manage_bakarim" class="nav-link">בקרים</a>
+    {% endif %}
+  </div>
+  <div class="nav-user">
+    {% if current_user %}
+      <span class="user-name">{{ current_user.full_name }}</span>
+      <a href="/logout" class="btn btn-sm btn-outline">יציאה</a>
+    {% endif %}
+  </div>
+</nav>

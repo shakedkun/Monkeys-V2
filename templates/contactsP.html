@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monkeys - אנשי קשר</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  {% include 'partials/navbar.html' %}
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>📇 אנשי קשר</h1>
+      <button class="btn btn-primary" id="addContactBtn">➕ איש קשר חדש</button>
+    </div>
+
+    <div class="filter-bar">
+      <input type="text" id="searchContacts" placeholder="חיפוש..." class="input">
+      <button class="btn btn-secondary" id="searchContactsBtn">🔍 חפש</button>
+    </div>
+
+    <div id="contactsList" class="table-container"></div>
+    <div id="contactsPagination" class="pagination"></div>
+
+    <div id="contactModal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="contactFormTitle">איש קשר חדש</h2>
+          <button class="modal-close" id="closeContactModal">&times;</button>
+        </div>
+        <form id="contactForm" class="auth-form">
+          <input type="hidden" id="editContactId">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="contactFirstName">שם פרטי</label>
+              <input type="text" id="contactFirstName" name="first_name" required class="input">
+            </div>
+            <div class="form-group">
+              <label for="contactLastName">שם משפחה</label>
+              <input type="text" id="contactLastName" name="last_name" required class="input">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="contactPhone">טלפון</label>
+            <input type="text" id="contactPhone" name="phone_number" required class="input">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="contactRole">תפקיד</label>
+              <input type="text" id="contactRole" name="role" class="input">
+            </div>
+            <div class="form-group">
+              <label for="contactSite">אתר</label>
+              <input type="text" id="contactSite" name="site" class="input">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full">שמור</button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let contactsPage = 1;
+
+    async function loadContacts(page) {
+      contactsPage = page || 1;
+      const search = document.getElementById('searchContacts').value;
+      const params = new URLSearchParams({ current_page: contactsPage });
+      if (search) params.set('search_string', search);
+      const resp = await fetch('/api/get_contacts?' + params.toString());
+      const data = await resp.json();
+      renderContacts(data.contacts_on_page);
+      renderContactsPagination(data.pages_number, data.current_page);
+    }
+
+    function renderContacts(contacts) {
+      const container = document.getElementById('contactsList');
+      if (!contacts.length) { container.innerHTML = '<div class="empty-state">אין אנשי קשר.</div>'; return; }
+      container.innerHTML = `
+        <table class="data-table">
+          <thead><tr><th>שם פרטי</th><th>שם משפחה</th><th>טלפון</th><th>תפקיד</th><th>אתר</th><th>פעולות</th></tr></thead>
+          <tbody>${contacts.map(c => `
+            <tr>
+              <td>${esc(c.first_name)}</td><td>${esc(c.last_name)}</td>
+              <td dir="ltr">${esc(c.phone_number)}</td><td>${esc(c.role)}</td><td>${esc(c.site)}</td>
+              <td class="actions-cell">
+                <button class="btn btn-xs btn-outline" onclick="editContact(${c.id},'${escA(c.first_name)}','${escA(c.last_name)}','${escA(c.phone_number)}','${escA(c.role)}','${escA(c.site)}')">✏️</button>
+                <button class="btn btn-xs btn-danger" onclick="deleteContact(${c.id})">🗑️</button>
+              </td>
+            </tr>`).join('')}</tbody>
+        </table>`;
+    }
+
+    function renderContactsPagination(total, current) {
+      const c = document.getElementById('contactsPagination');
+      if (total <= 1) { c.innerHTML = ''; return; }
+      c.innerHTML = Array.from({length: total}, (_, i) => i + 1)
+        .map(i => `<button class="btn btn-sm ${i===current?'btn-primary':'btn-outline'}" onclick="loadContacts(${i})">${i}</button>`).join('');
+    }
+
+    document.getElementById('addContactBtn').addEventListener('click', () => {
+      document.getElementById('contactFormTitle').textContent = 'איש קשר חדש';
+      document.getElementById('editContactId').value = '';
+      document.getElementById('contactForm').reset();
+      document.getElementById('contactModal').classList.remove('hidden');
+    });
+    document.getElementById('closeContactModal').addEventListener('click', () => document.getElementById('contactModal').classList.add('hidden'));
+
+    document.getElementById('contactForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const cid = document.getElementById('editContactId').value;
+      const data = {
+        first_name: document.getElementById('contactFirstName').value,
+        last_name: document.getElementById('contactLastName').value,
+        phone_number: document.getElementById('contactPhone').value,
+        role: document.getElementById('contactRole').value,
+        site: document.getElementById('contactSite').value,
+      };
+      if (cid) { data.contact_id = parseInt(cid); await fetch('/api/edit_contact', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) }); }
+      else { await fetch('/api/add_contact', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) }); }
+      document.getElementById('contactModal').classList.add('hidden');
+      loadContacts(contactsPage);
+    });
+
+    function editContact(id, fn, ln, ph, role, site) {
+      document.getElementById('contactFormTitle').textContent = 'עריכת איש קשר';
+      document.getElementById('editContactId').value = id;
+      document.getElementById('contactFirstName').value = fn;
+      document.getElementById('contactLastName').value = ln;
+      document.getElementById('contactPhone').value = ph;
+      document.getElementById('contactRole').value = role;
+      document.getElementById('contactSite').value = site;
+      document.getElementById('contactModal').classList.remove('hidden');
+    }
+
+    async function deleteContact(id) {
+      if (!confirm('למחוק איש קשר?')) return;
+      await fetch('/api/delete_contact?id=' + id);
+      loadContacts(contactsPage);
+    }
+
+    document.getElementById('searchContactsBtn').addEventListener('click', () => loadContacts(1));
+    document.querySelectorAll('.modal-backdrop').forEach(bd => bd.addEventListener('click', () => bd.closest('.modal').classList.add('hidden')));
+
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+    function escA(s) { return s ? s.replace(/'/g, "\\'") : ''; }
+
+    loadContacts(1);
+  </script>
+</body>
+</html>

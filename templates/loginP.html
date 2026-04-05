@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monkeys - כניסה</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="auth-page">
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1>🐒 Monkeys</h1>
+        <p>מערכת ניהול משימות</p>
+      </div>
+
+      <form id="loginForm" class="auth-form">
+        <div class="form-group">
+          <label for="username">שם משתמש</label>
+          <input type="text" id="username" name="username" required autocomplete="username" placeholder="הכנס שם משתמש">
+        </div>
+        <div class="form-group">
+          <label for="password">סיסמה</label>
+          <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="הכנס סיסמה">
+        </div>
+        <button type="submit" id="loginBtn" class="btn btn-primary btn-full">כניסה</button>
+        <div id="loginMessage" class="form-message"></div>
+      </form>
+
+      <div class="auth-footer">
+        <a href="{{ url_for('pages.password_recovery') }}">שכחתי סיסמה</a>
+        <span class="separator">|</span>
+        <a href="#" id="showRegister">הרשמה</a>
+      </div>
+    </div>
+
+    <!-- Registration Modal -->
+    <div id="registerModal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content auth-card">
+        <div class="modal-header">
+          <h2>הרשמה למערכת</h2>
+          <button class="modal-close" id="closeRegister">&times;</button>
+        </div>
+        <form id="registerForm" class="auth-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reg_username">שם משתמש</label>
+              <input type="text" id="reg_username" name="username" required>
+            </div>
+            <div class="form-group">
+              <label for="reg_full_name">שם מלא</label>
+              <input type="text" id="reg_full_name" name="full_name" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reg_password">סיסמה</label>
+              <input type="password" id="reg_password" name="password" required>
+            </div>
+            <div class="form-group">
+              <label for="reg_conpass">אימות סיסמה</label>
+              <input type="password" id="reg_conpass" name="conpass" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="reg_email">אימייל</label>
+            <input type="email" id="reg_email" name="email" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reg_team">צוות</label>
+              <input type="text" id="reg_team" name="team">
+            </div>
+            <div class="form-group">
+              <label for="reg_id_number">מספר אישי</label>
+              <input type="text" id="reg_id_number" name="id_number">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reg_phone">טלפון</label>
+              <input type="text" id="reg_phone" name="phone_number">
+            </div>
+            <div class="form-group">
+              <label for="reg_freedom_date">תאריך שחרור</label>
+              <input type="date" id="reg_freedom_date" name="freedom_date">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full">הרשמה</button>
+          <div id="registerMessage" class="form-message"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('loginMessage');
+      const data = {
+        username: document.getElementById('username').value,
+        password: document.getElementById('password').value,
+      };
+      try {
+        const resp = await fetch('/api/login_user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const result = await resp.json();
+        if (result.response === 'Logged in successfully.') {
+          msg.textContent = result.response;
+          msg.className = 'form-message success';
+          setTimeout(() => window.location.href = '/', 500);
+        } else {
+          msg.textContent = result.response;
+          msg.className = 'form-message error';
+        }
+      } catch (err) {
+        msg.textContent = 'שגיאה בהתחברות.';
+        msg.className = 'form-message error';
+      }
+    });
+
+    document.getElementById('showRegister').addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('registerModal').classList.remove('hidden');
+    });
+    document.getElementById('closeRegister').addEventListener('click', () => {
+      document.getElementById('registerModal').classList.add('hidden');
+    });
+    document.querySelector('.modal-backdrop')?.addEventListener('click', () => {
+      document.getElementById('registerModal').classList.add('hidden');
+    });
+
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('registerMessage');
+      const form = e.target;
+      const data = {
+        username: form.username.value,
+        password: form.password.value,
+        conpass: form.conpass.value,
+        email: form.email.value,
+        full_name: form.full_name.value,
+        team: form.team.value,
+        id_number: form.id_number.value,
+        phone_number: form.phone_number.value,
+        freedom_date: form.freedom_date.value,
+      };
+      try {
+        const resp = await fetch('/api/register_user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const result = await resp.json();
+        if (result.response === 'success') {
+          msg.textContent = 'ההרשמה בוצעה בהצלחה! ממתין לאישור מנהל.';
+          msg.className = 'form-message success';
+        } else {
+          msg.textContent = result.response;
+          msg.className = 'form-message error';
+        }
+      } catch (err) {
+        msg.textContent = 'שגיאה בהרשמה.';
+        msg.className = 'form-message error';
+      }
+    });
+  </script>
+</body>
+</html>

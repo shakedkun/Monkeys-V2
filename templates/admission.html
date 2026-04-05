@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monkeys - קבלת משתמשים</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  {% include 'partials/navbar.html' %}
+  <main class="main-content">
+    <div class="page-header"><h1>✅ קבלת משתמשים</h1></div>
+    <div class="info-banner">
+      <p>📋 כאן יופיעו משתמשים הממתינים לאישור (privilege = 0).</p>
+      <p class="text-muted">בגרסת הדמו, ניהול משתמשים מתבצע ישירות דרך ה-backend data store.</p>
+    </div>
+  </main>
+</body>
+</html>

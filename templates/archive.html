@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monkeys - ארכיון</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  {% include 'partials/navbar.html' %}
+
+  <main class="main-content">
+    <div class="page-header"><h1>🗄️ ארכיון</h1></div>
+
+    <div class="archive-layout">
+      <div class="archive-panel">
+        <h3>אתרים</h3>
+        <div class="filter-bar"><input type="text" id="siteSearch" placeholder="חיפוש אתר..." class="input"></div>
+        <div id="sitesList" class="list-container"></div>
+      </div>
+      <div class="archive-panel">
+        <h3>משימות</h3>
+        <div class="filter-bar">
+          <input type="text" id="taskSearch" placeholder="חיפוש משימה..." class="input" disabled>
+          <button class="btn btn-sm btn-primary" id="addArchiveTaskBtn" disabled>➕</button>
+        </div>
+        <div id="archiveTasksList" class="list-container"></div>
+      </div>
+      <div class="archive-panel">
+        <h3>קבצים</h3>
+        <div id="archiveFilesList" class="list-container"></div>
+        <form id="archiveUploadForm" class="form-inline" style="display:none" enctype="multipart/form-data">
+          <input type="file" name="pdf_file" id="archiveFileInput" class="input" accept=".pdf">
+          <input type="text" id="archiveFileName" placeholder="שם הקובץ" class="input">
+          <select id="archiveSpecialType" class="input">
+            <option value="">רגיל</option><option value="plan">תכנית</option><option value="log">יומן</option><option value="report">דוח</option>
+          </select>
+          <button type="submit" class="btn btn-sm btn-primary">📤 העלאה</button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let selectedSiteId = null, selectedTaskId = null;
+
+    async function loadSites() {
+      const s = document.getElementById('siteSearch').value;
+      const params = s ? `?search_string=${encodeURIComponent(s)}` : '';
+      const resp = await fetch('/api/get_sites' + params);
+      const sites = await resp.json();
+      document.getElementById('sitesList').innerHTML = sites.map(s =>
+        `<div class="list-item ${selectedSiteId===s.id?'active':''}" onclick="selectSite(${s.id})">${esc(s.name)}</div>`
+      ).join('') || '<div class="empty-state">אין אתרים.</div>';
+    }
+
+    function selectSite(id) {
+      selectedSiteId = id; selectedTaskId = null;
+      document.getElementById('taskSearch').disabled = false;
+      document.getElementById('addArchiveTaskBtn').disabled = false;
+      loadSites(); loadArchiveTasks();
+      document.getElementById('archiveFilesList').innerHTML = '';
+      document.getElementById('archiveUploadForm').style.display = 'none';
+    }
+
+    async function loadArchiveTasks() {
+      if (!selectedSiteId) return;
+      const s = document.getElementById('taskSearch').value;
+      const params = new URLSearchParams({ site_id: selectedSiteId });
+      if (s) params.set('search_string', s);
+      const resp = await fetch('/api/get_site_tasks?' + params.toString());
+      const tasks = await resp.json();
+      document.getElementById('archiveTasksList').innerHTML = tasks.map(t =>
+        `<div class="list-item ${selectedTaskId===t.id?'active':''}" onclick="selectArchiveTask(${t.id})">${esc(t.name)}</div>`
+      ).join('') || '<div class="empty-state">אין משימות.</div>';
+    }
+
+    function selectArchiveTask(id) { selectedTaskId = id; loadArchiveTasks(); loadArchiveFiles(); }
+
+    async function loadArchiveFiles() {
+      if (!selectedTaskId) return;
+      const resp = await fetch('/api/get_site_task_files?task_id=' + selectedTaskId);
+      const files = await resp.json();
+      document.getElementById('archiveFilesList').innerHTML = files.map(f =>
+        `<div class="file-item"><span>${esc(f.file_name)}</span>${f.special_type?`<span class="badge">${esc(f.special_type)}</span>`:''}<a href="/api/download_archive_file?file_id=${f.id}" class="btn btn-xs btn-outline">📥</a></div>`
+      ).join('') || '<div class="empty-state">אין קבצים.</div>';
+      document.getElementById('archiveUploadForm').style.display = 'flex';
+    }
+
+    document.getElementById('addArchiveTaskBtn').addEventListener('click', async () => {
+      const name = prompt('שם המשימה:'); if (!name) return;
+      await fetch('/api/add_archive_task', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name,site_id:selectedSiteId}) });
+      loadArchiveTasks();
+    });
+
+    document.getElementById('archiveUploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData();
+      fd.append('pdf_file', document.getElementById('archiveFileInput').files[0]);
+      fd.append('file_name', document.getElementById('archiveFileName').value);
+      fd.append('site_id', selectedSiteId);
+      fd.append('task_id', selectedTaskId);
+      fd.append('special_type', document.getElementById('archiveSpecialType').value);
+      await fetch('/api/add_file_archive_task', { method:'POST', body:fd });
+      loadArchiveFiles();
+    });
+
+    document.getElementById('siteSearch').addEventListener('input', loadSites);
+    document.getElementById('taskSearch').addEventListener('input', loadArchiveTasks);
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+    loadSites();
+  </script>
+</body>
+</html>

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monkeys - משימות</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  {% include 'partials/navbar.html' %}
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>
+        {% if page_type == 'binyan_coah' %}
+          💪 בניין כוח
+        {% elif page_type == 'hafifa' %}
+          🔄 הפיפה
+        {% else %}
+          📋 משימות
+        {% endif %}
+      </h1>
+      <button class="btn btn-primary" id="addTaskBtn">➕ משימה חדשה</button>
+    </div>
+
+    <!-- Search / Filter bar -->
+    <div class="filter-bar">
+      <input type="text" id="searchContent" placeholder="חיפוש..." class="input">
+      <select id="filterCategory" class="input">
+        <option value="">כל הקטגוריות</option>
+        {% for c in cat %}
+          <option value="{{ c.id }}" {{ 'selected' if category_id|string == c.id|string else '' }}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+      <input type="text" id="filterLocation" list="locationList" placeholder="מיקום" class="input">
+      <datalist id="locationList">
+        {% for loc in locations %}
+          <option value="{{ loc }}">
+        {% endfor %}
+      </datalist>
+      <input type="date" id="filterStartDate" class="input">
+      <input type="date" id="filterEndDate" class="input">
+      <button class="btn btn-secondary" id="searchBtn">🔍 חפש</button>
+    </div>
+
+    <div id="tasksList" class="tasks-list"></div>
+    <div id="pagination" class="pagination"></div>
+
+    <!-- Task Detail Modal -->
+    <div id="taskModal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content modal-lg">
+        <div class="modal-header">
+          <h2 id="taskModalTitle">פרטי משימה</h2>
+          <button class="modal-close" id="closeTaskModal">&times;</button>
+        </div>
+        <div class="modal-body" id="taskModalBody"></div>
+      </div>
+    </div>
+
+    <!-- Add/Edit Task Modal -->
+    <div id="taskFormModal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="taskFormTitle">משימה חדשה</h2>
+          <button class="modal-close" id="closeTaskForm">&times;</button>
+        </div>
+        <form id="taskForm" class="auth-form">
+          <input type="hidden" id="editPostId">
+          <div class="form-group">
+            <label for="taskTitle">כותרת</label>
+            <input type="text" id="taskTitle" name="title" required class="input">
+          </div>
+          <div class="form-group">
+            <label for="taskContent">תוכן</label>
+            <textarea id="taskContent" name="content" required class="input textarea" rows="5"></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="taskCategory">קטגוריה</label>
+              <select id="taskCategory" name="category_id" required class="input">
+                {% for c in cat %}
+                  <option value="{{ c.id }}">{{ c.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="taskLocation">מיקום</label>
+              <input type="text" id="taskLocation" name="location" list="locationList" required class="input">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full">שמור</button>
+          <div id="taskFormMessage" class="form-message"></div>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const PAGE_TYPE = '{{ page_type }}';
+    const CATEGORY_ID = '{{ category_id }}';
+    const TASK_TO_OPEN = '{{ task_to_open }}';
+    let currentPage = 1;
+
+    async function loadTasks(page) {
+      currentPage = page || 1;
+      const params = new URLSearchParams();
+      params.set('current_page', currentPage);
+      const content = document.getElementById('searchContent').value;
+      if (content) params.set('content', content);
+      const cat = document.getElementById('filterCategory').value;
+      if (cat) params.set('category_id', cat);
+      else if (CATEGORY_ID) params.set('category_id', CATEGORY_ID);
+      const loc = document.getElementById('filterLocation').value;
+      if (loc) params.set('location', loc);
+      const sd = document.getElementById('filterStartDate').value;
+      if (sd) params.set('start_date', sd);
+      const ed = document.getElementById('filterEndDate').value;
+      if (ed) params.set('end_date', ed);
+
+      const resp = await fetch('/api/get_tasks?' + params.toString());
+      const data = await resp.json();
+      renderTasks(data.tasks_on_page);
+      renderPagination(data.pages_number, data.current_page);
+    }
+
+    function renderTasks(tasks) {
+      const container = document.getElementById('tasksList');
+      if (!tasks.length) {
+        container.innerHTML = '<div class="empty-state">אין משימות להצגה.</div>';
+        return;
+      }
+      container.innerHTML = tasks.map(t => `
+        <div class="task-card" data-id="${t.id}" onclick="openTask(${t.id})">
+          <div class="task-card-header">
+            <h3>${escHtml(t.title)}</h3>
+            <span class="badge">${escHtml(t.location)}</span>
+          </div>
+          <p class="task-card-content">${escHtml(t.content).substring(0, 120)}${t.content.length > 120 ? '...' : ''}</p>
+          <div class="task-card-footer">
+            <span class="meta">👤 ${escHtml(t.username)}</span>
+            <span class="meta">📅 ${t.date_posted}</span>
+            ${t.edited ? '<span class="meta edited">✏️ נערך</span>' : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderPagination(total, current) {
+      const container = document.getElementById('pagination');
+      if (total <= 1) { container.innerHTML = ''; return; }
+      let html = '';
+      for (let i = 1; i <= total; i++) {
+        html += `<button class="btn btn-sm ${i === current ? 'btn-primary' : 'btn-outline'}" onclick="loadTasks(${i})">${i}</button>`;
+      }
+      container.innerHTML = html;
+    }
+
+    async function openTask(id) {
+      const [taskResp, commentsResp, filesResp] = await Promise.all([
+        fetch('/api/get_task?task_id=' + id),
+        fetch('/api/get_comments_for_task?task_id=' + id),
+        fetch('/api/get_task_files_list?task_id=' + id),
+      ]);
+      const task = await taskResp.json();
+      const comments = await commentsResp.json();
+      const files = await filesResp.json();
+
+      document.getElementById('taskModalTitle').textContent = task.title;
+      document.getElementById('taskModalBody').innerHTML = `
+        <div class="task-detail">
+          <div class="task-meta-bar">
+            <span>👤 ${escHtml(task.username)}</span>
+            <span>📍 ${escHtml(task.location)}</span>
+            <span>📅 ${task.date_posted}</span>
+            ${task.edited ? '<span>✏️ נערך: ' + task.edited + '</span>' : ''}
+          </div>
+          <div class="task-content-full">${escHtml(task.content)}</div>
+          <div class="task-actions">
+            <button class="btn btn-sm btn-secondary" onclick="editTask(${task.id}, '${escAttr(task.title)}', \`${escAttr(task.content)}\`)">✏️ עריכה</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteTask(${task.id})">🗑️ מחיקה</button>
+          </div>
+          <hr>
+          <h3>📎 קבצים (${files.length})</h3>
+          <div class="files-list">
+            ${files.map(f => `
+              <div class="file-item">
+                <span>${escHtml(f.file_name)}</span>
+                <button class="btn btn-sm btn-danger" onclick="deleteFile(${f.id}, ${task.id})">🗑️</button>
+              </div>
+            `).join('') || '<p>אין קבצים.</p>'}
+          </div>
+          <form id="uploadFileForm" class="form-inline" enctype="multipart/form-data">
+            <input type="file" name="file" id="fileInput" class="input">
+            <button type="submit" class="btn btn-sm btn-secondary">📤 העלאה</button>
+          </form>
+          <hr>
+          <h3>💬 תגובות (${comments.length})</h3>
+          <div class="comments-list">
+            ${comments.map(c => `
+              <div class="comment-item" data-id="${c.id}">
+                <div class="comment-header">
+                  <strong>${escHtml(c.userID)}</strong>
+                  <span>${c.data_posted}</span>
+                  ${c.edited && c.edited.length ? '<span class="edited">נערך</span>' : ''}
+                </div>
+                <p>${escHtml(c.content)}</p>
+                <div class="comment-actions">
+                  <button class="btn btn-xs btn-outline" onclick="editComment(${c.id}, \`${escAttr(c.content)}\`, ${task.id})">✏️</button>
+                  <button class="btn btn-xs btn-danger" onclick="deleteComment(${c.id}, ${task.id})">🗑️</button>
+                </div>
+              </div>
+            `).join('') || '<p>אין תגובות.</p>'}
+          </div>
+          <form id="addCommentForm" class="form-inline">
+            <input type="text" id="commentContent" placeholder="כתוב תגובה..." class="input" required>
+            <button type="submit" class="btn btn-sm btn-primary">שלח</button>
+          </form>
+        </div>
+      `;
+
+      document.getElementById('uploadFileForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData();
+        formData.append('file', document.getElementById('fileInput').files[0]);
+        formData.append('taskid', task.id);
+        await fetch('/api/upload_post_file', { method: 'POST', body: formData });
+        openTask(task.id);
+      });
+
+      document.getElementById('addCommentForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const content = document.getElementById('commentContent').value;
+        await fetch('/api/add_comment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, post_id: task.id }),
+        });
+        openTask(task.id);
+      });
+
+      document.getElementById('taskModal').classList.remove('hidden');
+    }
+
+    async function deleteTask(id) {
+      if (!confirm('למחוק את המשימה?')) return;
+      await fetch('/api/delete_post?id=' + id);
+      document.getElementById('taskModal').classList.add('hidden');
+      loadTasks(currentPage);
+    }
+
+    function editTask(id, title, content) {
+      document.getElementById('taskModal').classList.add('hidden');
+      document.getElementById('taskFormTitle').textContent = 'עריכת משימה';
+      document.getElementById('editPostId').value = id;
+      document.getElementById('taskTitle').value = title;
+      document.getElementById('taskContent').value = content;
+      document.getElementById('taskFormModal').classList.remove('hidden');
+    }
+
+    async function deleteComment(id, taskId) {
+      if (!confirm('למחוק תגובה?')) return;
+      await fetch('/api/delete_comment?id=' + id);
+      openTask(taskId);
+    }
+
+    async function editComment(id, currentContent, taskId) {
+      const newContent = prompt('ערוך תגובה:', currentContent);
+      if (newContent === null) return;
+      await fetch('/api/edit_comment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment_id: id, content: newContent, post_id: taskId }),
+      });
+      openTask(taskId);
+    }
+
+    async function deleteFile(id, taskId) {
+      if (!confirm('למחוק קובץ?')) return;
+      await fetch('/api/delete_file?id=' + id);
+      openTask(taskId);
+    }
+
+    document.getElementById('addTaskBtn').addEventListener('click', () => {
+      document.getElementById('taskFormTitle').textContent = 'משימה חדשה';
+      document.getElementById('editPostId').value = '';
+      document.getElementById('taskForm').reset();
+      document.getElementById('taskFormModal').classList.remove('hidden');
+    });
+
+    document.getElementById('taskForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('taskFormMessage');
+      const postId = document.getElementById('editPostId').value;
+      const data = {
+        title: document.getElementById('taskTitle').value,
+        content: document.getElementById('taskContent').value,
+        category_id: document.getElementById('taskCategory').value,
+        location: document.getElementById('taskLocation').value,
+      };
+
+      let endpoint, body;
+      if (postId) {
+        endpoint = '/api/edit_post';
+        body = { post_id: parseInt(postId), title: data.title, content: data.content };
+      } else {
+        endpoint = '/api/add_post';
+        body = data;
+      }
+
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const result = await resp.json();
+      if (result.response === 'success') {
+        document.getElementById('taskFormModal').classList.add('hidden');
+        loadTasks(currentPage);
+      } else {
+        msg.textContent = 'שגיאה בשמירה.';
+        msg.className = 'form-message error';
+      }
+    });
+
+    document.getElementById('searchBtn').addEventListener('click', () => loadTasks(1));
+    document.getElementById('closeTaskModal').addEventListener('click', () => document.getElementById('taskModal').classList.add('hidden'));
+    document.getElementById('closeTaskForm').addEventListener('click', () => document.getElementById('taskFormModal').classList.add('hidden'));
+    document.querySelectorAll('.modal-backdrop').forEach(bd => {
+      bd.addEventListener('click', () => bd.closest('.modal').classList.add('hidden'));
+    });
+
+    function escHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function escAttr(str) {
+      if (!str) return '';
+      return str.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/`/g,'\\`').replace(/\n/g,'\\n');
+    }
+
+    loadTasks(1);
+    if (TASK_TO_OPEN) setTimeout(() => openTask(parseInt(TASK_TO_OPEN)), 500);
+  </script>
+</body>
+</html>

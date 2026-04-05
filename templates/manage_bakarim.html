@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monkeys - ניהול בקרים</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  {% include 'partials/navbar.html' %}
+  <main class="main-content">
+    <div class="page-header">
+      <h1>👥 ניהול בקרים</h1>
+      <button class="btn btn-primary" id="addBakarBtn">➕ בקר חדש</button>
+    </div>
+    <div id="bakarimList" class="table-container"></div>
+    <div id="bakarModal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="bakarFormTitle">בקר חדש</h2>
+          <button class="modal-close" id="closeBakarModal">&times;</button>
+        </div>
+        <form id="bakarForm" class="auth-form">
+          <input type="hidden" id="editBakarId">
+          <div class="form-group">
+            <label for="bakarFullName">שם מלא</label>
+            <input type="text" id="bakarFullName" required class="input">
+          </div>
+          <div class="form-group">
+            <label for="bakarTNumber">מספר T</label>
+            <input type="text" id="bakarTNumber" required class="input">
+          </div>
+          <button type="submit" class="btn btn-primary btn-full">שמור</button>
+        </form>
+      </div>
+    </div>
+  </main>
+  <script>
+    async function loadBakarim(){const r=await fetch('/get-bakarim');const b=await r.json();if(!b.length){document.getElementById('bakarimList').innerHTML='<div class="empty-state">אין בקרים.</div>';return;}document.getElementById('bakarimList').innerHTML=`<table class="data-table"><thead><tr><th>#</th><th>שם מלא</th><th>מספר T</th><th>פעולות</th></tr></thead><tbody>${b.map(x=>`<tr><td>${x.id}</td><td>${esc(x.full_name)}</td><td dir="ltr">${esc(x.t_number)}</td><td class="actions-cell"><button class="btn btn-xs btn-outline" onclick="editBakar(${x.id},'${escA(x.full_name)}','${escA(x.t_number)}')">✏️</button><button class="btn btn-xs btn-danger" onclick="deleteBakar(${x.id})">🗑️</button></td></tr>`).join('')}</tbody></table>`;}
+    document.getElementById('addBakarBtn').addEventListener('click',()=>{document.getElementById('bakarFormTitle').textContent='בקר חדש';document.getElementById('editBakarId').value='';document.getElementById('bakarForm').reset();document.getElementById('bakarModal').classList.remove('hidden');});
+    document.getElementById('closeBakarModal').addEventListener('click',()=>document.getElementById('bakarModal').classList.add('hidden'));
+    document.querySelector('#bakarModal .modal-backdrop').addEventListener('click',()=>document.getElementById('bakarModal').classList.add('hidden'));
+    document.getElementById('bakarForm').addEventListener('submit',async(e)=>{e.preventDefault();const bid=document.getElementById('editBakarId').value;const d={full_name:document.getElementById('bakarFullName').value,t_number:document.getElementById('bakarTNumber').value};if(bid){d.bakar_id=parseInt(bid);await fetch('/update-bakar',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});}else{await fetch('/create-bakar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});}document.getElementById('bakarModal').classList.add('hidden');loadBakarim();});
+    function editBakar(id,n,t){document.getElementById('bakarFormTitle').textContent='עריכת בקר';document.getElementById('editBakarId').value=id;document.getElementById('bakarFullName').value=n;document.getElementById('bakarTNumber').value=t;document.getElementById('bakarModal').classList.remove('hidden');}
+    async function deleteBakar(id){if(!confirm('למחוק בקר?'))return;await fetch('/delete-bakar?bakar_id='+id,{method:'DELETE'});loadBakarim();}
+    function esc(s){return s?s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):'';}
+    function escA(s){return s?s.replace(/'/g,"\\'"):'';}
+    loadBakarim();
+  </script>
+</body>
+</html>

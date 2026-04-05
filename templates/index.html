@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monkeys - לוח בקרה</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  {% include 'partials/navbar.html' %}
+
+  <main class="main-content">
+    <div class="dashboard-header">
+      <h1>שלום, {{ username }}! 👋</h1>
+      <p class="freedom-info">תאריך שחרור: <strong>{{ freedom_date }}</strong></p>
+    </div>
+
+    <div class="dashboard-grid">
+      <a href="/tasks" class="dashboard-card" id="nav-tasks">
+        <div class="card-icon">📋</div>
+        <h3>משימות</h3>
+        <p>ניהול וצפייה במשימות</p>
+      </a>
+      <a href="/contacts" class="dashboard-card" id="nav-contacts">
+        <div class="card-icon">📇</div>
+        <h3>אנשי קשר</h3>
+        <p>ספר טלפונים</p>
+      </a>
+      <a href="/archive" class="dashboard-card" id="nav-archive">
+        <div class="card-icon">🗄️</div>
+        <h3>ארכיון</h3>
+        <p>ארכיון קבצים ומסמכים</p>
+      </a>
+      <a href="/gant" class="dashboard-card" id="nav-gant">
+        <div class="card-icon">📊</div>
+        <h3>גנט</h3>
+        <p>תרשים גנט</p>
+      </a>
+      <a href="/binyan_coah" class="dashboard-card" id="nav-bc">
+        <div class="card-icon">💪</div>
+        <h3>בניין כוח</h3>
+        <p>ניהול בניין כוח</p>
+      </a>
+      <a href="/hafifa" class="dashboard-card" id="nav-hafifa">
+        <div class="card-icon">🔄</div>
+        <h3>הפיפה</h3>
+        <p>ניהול הפיפה</p>
+      </a>
+      <a href="/transfer_page" class="dashboard-card" id="nav-transfer">
+        <div class="card-icon">📤</div>
+        <h3>חפיפה</h3>
+        <p>דף חפיפה</p>
+      </a>
+      {% if current_user and current_user.privilege >= 2 %}
+      <a href="/admission" class="dashboard-card admin-card" id="nav-admission">
+        <div class="card-icon">✅</div>
+        <h3>קבלה</h3>
+        <p>ניהול משתמשים חדשים</p>
+      </a>
+      <a href="/manage_bakarim" class="dashboard-card admin-card" id="nav-bakarim">
+        <div class="card-icon">👥</div>
+        <h3>ניהול בקרים</h3>
+        <p>ניהול רשימת בקרים</p>
+      </a>
+      {% endif %}
+    </div>
+  </main>
+</body>
+</html>
